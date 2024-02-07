@@ -155,6 +155,9 @@ local function get_task_builder(defn, precalculated_vars)
       table.insert(components, 1, {
         "on_output_parse",
         problem_matcher = pmatcher,
+        precalculated_vars = {
+          cwd = opts.cwd,
+        },
       })
     end
     if defn.isBackground then
