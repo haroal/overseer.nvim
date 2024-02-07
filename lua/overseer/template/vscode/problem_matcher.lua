@@ -366,6 +366,17 @@ local function convert_pattern(pattern, opts)
       return nil
     end
   end
+  -- Handle sequence of patterns recursively (e.g. "$eslint-stylish" pattern above)
+  if vim.tbl_islist(pattern) then
+    local parse_node = { "sequence" }
+    for _, subpattern in ipairs(pattern) do
+      local subnode = convert_pattern(subpattern, opts)
+      if subnode then
+        table.insert(parse_node, subnode)
+      end
+    end
+    return parse_node
+  end
   local args = {}
   local full_line_key
   local max_arg = 0
