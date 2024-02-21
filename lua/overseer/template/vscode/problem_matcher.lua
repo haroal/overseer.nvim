@@ -60,7 +60,7 @@ local default_patterns = {
   },
   ["$jshint"] = {
     regexp = "^(.*):\\s+line\\s+(\\d+),\\s+col\\s+(\\d+),\\s(.+?)(?:\\s+\\((\\w)(\\d+)\\))?$",
-    vim_regexp = "\\v^(.*):\\s+line\\s+(\\d+),\\s+col\\s+(\\d+),\\s(.+?)%(\\s+\\((\\w)(\\d+)\\))?$",
+    vim_regexp = "\\v^(.*):\\s+line\\s+(\\d+),\\s+col\\s+(\\d+),\\s(.{-1,})%(\\s+\\((\\w)(\\d+)\\))?$",
     kind = "location",
     file = 1,
     line = 2,
@@ -77,7 +77,7 @@ local default_patterns = {
     },
     {
       regexp = "^\\s+line\\s+(\\d+)\\s+col\\s+(\\d+)\\s+(.+?)(?:\\s+\\((\\w)(\\d+)\\))?$",
-      vim_regexp = "\\v^\\s+line\\s+(\\d+)\\s+col\\s+(\\d+)\\s+(.+?)%(\\s+\\((\\w)(\\d+)\\))?$",
+      vim_regexp = "\\v^\\s+line\\s+(\\d+)\\s+col\\s+(\\d+)\\s+(.{-1,})%(\\s+\\((\\w)(\\d+)\\))?$",
       line = 1,
       character = 2,
       message = 3,
@@ -99,13 +99,13 @@ local default_patterns = {
   ["$eslint-stylish"] = {
     {
       regexp = "^((?:[a-zA-Z]:)*[./\\\\]+.*?)$",
-      vim_regexp = "\\v^(%([a-zA-Z]:)*[./\\\\]+.*?)$",
+      vim_regexp = "\\v^(%([a-zA-Z]:)*[./\\\\]+.{-})$",
       kind = "location",
       file = 1,
     },
     {
       regexp = "^\\s+(\\d+):(\\d+)\\s+(error|warning|info)\\s+(.+?)(?:\\s\\s+(.*))?$",
-      vim_regexp = "\\v^\\s+(\\d+):(\\d+)\\s+(error|warning|info)\\s+(.+?)%(\\s\\s+(.*))?$",
+      vim_regexp = "\\v^\\s+(\\d+):(\\d+)\\s+(error|warning|info)\\s+(.{-1,})%(\\s\\s+(.*))?$",
       line = 1,
       character = 2,
       severity = 3,
@@ -358,25 +358,6 @@ end
 
 local function convert_pattern(pattern, opts)
   opts = opts or {}
-  if type(pattern) == "string" then
-    if default_patterns[pattern] then
-      pattern = vim.deepcopy(default_patterns[pattern])
-    else
-      log:error("Could not find problem matcher pattern '%s'", pattern)
-      return nil
-    end
-  end
-  -- Handle sequence of patterns recursively (e.g. "$eslint-stylish" pattern above)
-  if vim.tbl_islist(pattern) then
-    local parse_node = { "sequence" }
-    for _, subpattern in ipairs(pattern) do
-      local subnode = convert_pattern(subpattern, opts)
-      if subnode then
-        table.insert(parse_node, subnode)
-      end
-    end
-    return parse_node
-  end
   local args = {}
   local full_line_key
   local max_arg = 0
@@ -561,10 +542,19 @@ M.get_parser_from_problem_matcher = function(problem_matcher, precalculated_vars
   local convert = problem_matcher.fileLocation
     and file_converter(problem_matcher.fileLocation, precalculated_vars)
   local ret
+  if type(pattern) == "string" then
+    if default_patterns[pattern] then
+      pattern = vim.deepcopy(default_patterns[pattern])
+    else
+      log:error("Could not find problem matcher pattern '%s'", pattern)
+      return nil
+    end
+  end
+
   if vim.tbl_islist(pattern) then
     ret = { "sequence" }
     for i, v in ipairs(pattern) do
-      local append = i == #pattern
+      local append = v.append or i == #pattern
       local parse_node =
         convert_pattern(v, { append = append, qf_type = qf_type, file_convert = convert })
       if not parse_node then
